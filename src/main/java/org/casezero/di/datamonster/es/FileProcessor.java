@@ -47,6 +47,11 @@ public class FileProcessor {
 	
     public void firstPass () throws IOException {
 	    es = new EsClient();
+	    
+	    // if we are asked to delete index first
+	    if (cmd.hasOption("D"))
+	    	es.deleteIndex(alias);
+	    
 	    String[] nextRow;
 	    HashMap<String, String> doc = new HashMap<String, String>();
 	    
@@ -58,7 +63,7 @@ public class FileProcessor {
 	    		doc.put(headers.get(i).getOriginalFieldName(), nextRow[i]);
 	    	}
 	        try {
-	    	    es.putData(alias, type, gson.toJson(doc));
+	    	    es.bulkAdd(alias, type, gson.toJson(doc));
 	        } catch (Exception e) {
     			log.error("Failed to load data on line "+ lineCount +":\n"+ gson.toJson(doc));
     	        log.info(e.getStackTrace().toString());

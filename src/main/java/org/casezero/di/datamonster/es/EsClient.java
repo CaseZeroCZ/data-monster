@@ -2,8 +2,13 @@ package org.casezero.di.datamonster.es;
 
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexResponse;
 import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingResponse;
+import org.elasticsearch.action.bulk.BulkProcessor;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.IndicesAdminClient;
@@ -45,6 +50,8 @@ public class EsClient {
     private String esClusterID;
     private String esRegion;
     private boolean enableSSL;
+    
+    private BulkProcessor bulkProcessor;
 
     public EsClient() {
         setupClient();
@@ -90,7 +97,7 @@ public class EsClient {
             Settings settings = Settings.settingsBuilder()
                     .put("transport.ping_schedule", "5s")
                     .put("cluster.name", esClusterID)
-                    .put("action.bulk.compress", false)
+                    .put("action.bulk.compress", false) //NEVER set this to true it hangs the processor
                     .put("shield.transport.ssl", enableSSL)
                     .put("request.headers.X-Found-Cluster", esClusterID)
                     .put("shield.user", new StringBuilder()
@@ -119,6 +126,25 @@ public class EsClient {
         catch (UnknownHostException e) {
             log.error("Unable to connect to client", e);
         }
+        
+        // set up bulk processor
+        bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
+            public void beforeBulk(long executionId, BulkRequest request) {
+                log.info("Going to execute new bulk composed of {} actions", request.numberOfActions());
+            }
+
+            public void afterBulk(long executionId, BulkRequest request, BulkResponse response) {
+                log.info("Executed bulk composed of {} actions", request.numberOfActions());
+            }
+
+            public void afterBulk(long executionId, BulkRequest request, Throwable failure) {
+                log.warn("Error executing bulk", failure);
+            }
+            }).build();
+    }
+    
+    public void bulkFlush() {
+    	bulkProcessor.flush();
     }
 
     public void deleteOldIndexes (String prefix) {
@@ -168,6 +194,17 @@ public class EsClient {
                 .execute().actionGet();
     }
 
+    /**
+     * Add data to ES Index record by record
+     * @param index
+     * @param type
+     * @param json
+     * @return
+     */
+    public void bulkAdd(String index, String type, String json) {
+    	bulkProcessor.add(client.prepareIndex(index, type).setSource(json).request());
+    }
+    
     /**
      * Add data to ES Index record by record
      * @param index
@@ -249,6 +286,7 @@ public class EsClient {
      * close the ES transport client
      */
     public void close(){
+    	bulkProcessor.close();
         client.close();
     }
 
@@ -266,6 +304,19 @@ public class EsClient {
                 .append(dtfOut.print(dateTime))
                 .toString();
 
+    }
+    
+    /**
+     * Delete index
+     * @param index
+     * 
+     */
+    public void deleteIndex(String index) {
+    	DeleteIndexResponse delete = client.admin().indices().delete(new DeleteIndexRequest(index)).actionGet();
+    	if (!delete.isAcknowledged()) {
+    		log.error("Index ("+ index +") was not deleted successfully");
+    		// TODO: should app die here?
+    	}
     }
 
     /**
