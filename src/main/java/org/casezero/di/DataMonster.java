@@ -28,8 +28,9 @@ public class DataMonster {
      * play with ES client
      * @param args
      * @throws IOException 
+     * @throws InterruptedException 
      */
-    public static void main (String [] args) throws IOException{
+    public static void main (String [] args) throws IOException, InterruptedException{
     	CommandLine cmd = new CommandLineArgs(args).parse();
     	
     	CSVReader reader = new CSVReader(new FileReader(cmd.getOptionValue("i")));

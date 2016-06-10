@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -284,9 +285,10 @@ public class EsClient {
 
     /**
      * close the ES transport client
+     * @throws InterruptedException 
      */
-    public void close(){
-    	bulkProcessor.close();
+    public void close() throws InterruptedException{
+    	bulkProcessor.awaitClose(5, TimeUnit.MINUTES);
         client.close();
     }
 

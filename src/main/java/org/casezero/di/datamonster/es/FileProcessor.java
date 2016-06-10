@@ -45,7 +45,7 @@ public class FileProcessor {
 		// maybe place es client setup here? don't know yet
 	}
 	
-    public void firstPass () throws IOException {
+    public void firstPass () throws IOException, InterruptedException {
 	    es = new EsClient();
 	    
 	    // if we are asked to delete index first
