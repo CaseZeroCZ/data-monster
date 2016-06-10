@@ -9,7 +9,10 @@ import org.elasticsearch.action.admin.indices.mapping.put.PutMappingResponse;
 import org.elasticsearch.action.bulk.BulkProcessor;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.IndicesAdminClient;
 import org.elasticsearch.client.transport.TransportClient;
@@ -18,7 +21,10 @@ import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.shield.ShieldPlugin;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -32,6 +38,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -329,4 +336,31 @@ public class EsClient {
         return client;
     }
     
+    public void reindex(String oldIndex, String newIndex) throws InterruptedException {
+    	SearchResponse scrollResp = client.prepareSearch(oldIndex) // Specify index
+    			.setSearchType(SearchType.DEFAULT)
+    		    .setScroll(new TimeValue(60000))
+    		    .setQuery(QueryBuilders.matchAllQuery()) // Match all query
+    		    .setSize(100).execute().actionGet(); //100 hits per shard will be returned for each scroll
+    	
+    	//Scroll until no hits are returned
+    	while (true) {
+    	    scrollResp = client.prepareSearchScroll(scrollResp.getScrollId()).setScroll(new TimeValue(600000)).execute().actionGet();
+    	    //Break condition: No hits are returned
+    	    if (scrollResp.getHits().getHits().length == 0) {
+    	        log.info("Closing the bulk processor");
+    	        bulkProcessor.awaitClose(5, TimeUnit.MINUTES);
+    	        break; 
+    	    }
+    	    // Get results from a scan search and add it to bulk ingest
+    	    for (SearchHit hit: scrollResp.getHits()) {
+    	        IndexRequest request = new IndexRequest(newIndex, hit.type(), hit.id());
+    	        Map source = ((Map) ((Map) hit.getSource()));
+    	        request.source(source);
+    	        bulkProcessor.add(request);
+    	   }
+    	}
+    	
+    	
+    }
 }

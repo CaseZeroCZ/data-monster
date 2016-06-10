@@ -1,8 +1,10 @@
 package org.casezero.di.datamonster.es;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 
 import org.apache.commons.cli.CommandLine;
 import org.casezero.di.datamonster.Field;
@@ -30,8 +32,11 @@ public class FileProcessor {
 	private CSVReader file;
 	
 	private Gson gson = new Gson();
-	
 	private EsClient es;
+	private Properties prop = new Properties();
+	private Properties propDataTypes = new Properties();
+	private HashMap<String,Object> mappedVars = new HashMap<String,Object>();
+	
 	
 	public FileProcessor ( String alias, String type, 
 			               List<Field> headers, CommandLine cmd, 
@@ -45,15 +50,23 @@ public class FileProcessor {
 		// maybe place es client setup here? don't know yet
 	}
 	
-    public void firstPass () throws IOException, InterruptedException {
-	    es = new EsClient();
-	    
-	    // if we are asked to delete index first
-	    if (cmd.hasOption("D"))
-	    	es.deleteIndex(alias);
+	private void loadProps() throws IOException {
+		// TODO: move this to DataMonster where headers are parsed?
+    	InputStream mappings = this.getClass().getResourceAsStream("/mappings.properties");
+    	prop.load(mappings);
+    	
+    	InputStream dataTypes = this.getClass().getResourceAsStream("/mapping-data-type.properties");
+    	propDataTypes.load(dataTypes);
+	}
+	
+    public void firstPass () throws InterruptedException, IOException {
+	    // set up
+    	es = new EsClient();
+    	loadProps();
+    	String alias = this.alias +"_firstpass";
 	    
 	    String[] nextRow;
-	    HashMap<String, String> doc = new HashMap<String, String>();
+	    HashMap<String, Object> doc = new HashMap<String, Object>();
 	    
 	    es.setupIndex(alias);
 	    
@@ -61,6 +74,10 @@ public class FileProcessor {
 	    while((nextRow = file.readNext()) != null) {
 	    	for (int i = 0; i < nextRow.length; i++) {
 	    		doc.put(headers.get(i).getOriginalFieldName(), nextRow[i]);
+	    		if (prop.containsKey(headers.get(i).getOriginalFieldName().toLowerCase())) {
+	    			
+	    			addNewStructureToDoc(doc, nextRow[i], prop.getProperty(headers.get(i).getOriginalFieldName().toLowerCase()), new String());
+	    		}
 	    	}
 	        try {
 	    	    es.bulkAdd(alias, type, gson.toJson(doc));
@@ -71,11 +88,90 @@ public class FileProcessor {
 	        lineCount++;
 	    }
 	    
-	    es.close();
     }
     
-    public void secondPass () {
+    private void addNewStructureToDoc( HashMap<String, Object> doc, 
+    		                           Object value, 
+    		                           String remainingPath,
+    		                           String path) {
+    	String key;
     	
+    	if (remainingPath.contains(".")) {
+    		int indexOfDot = remainingPath.indexOf('.');
+    		key = remainingPath.substring(0, indexOfDot);
+    		if (!doc.containsKey(key)) {
+    			doc.put(key, new HashMap<String,Object>());
+    		}
+    		
+    		path = joinPath(path, key);
+    		
+    		addNewStructureToDoc( (HashMap<String, Object>) doc.get(key), value, remainingPath.substring(indexOfDot + 1), path);
+
+    	} else {
+    		key = remainingPath;
+    		doc.put(key, value);
+    		
+    		path = joinPath(path, key);
+    	}
+    	
+    	// check if path has a mapping and add it
+    	if(propDataTypes.containsKey(path)) {
+    	    String[] pathNames = path.split("\\.");
+    	    if (pathNames.length == 0)
+    	    	return;
+    	    HashMap<String, Object> currMap = mappedVars;
+    	    
+    	    for(String pathName : pathNames) {
+    	    	if (currMap.containsKey("properties")) {
+    	    		currMap = (HashMap<String, Object>) currMap.get("properties");
+    	    	}
+    	    	if (!currMap.containsKey(pathName)) {
+    	    		currMap.put(pathName, new HashMap<String,Object>());
+    	    		((HashMap<String,Object>) currMap.get(pathName)).put("properties", new HashMap<String,Object>());
+    	    	}
+    	    	currMap = (HashMap<String, Object>) currMap.get(pathName);
+    	    }
+    	    
+    	    currMap.put("type", propDataTypes.getProperty(path));
+    	    currMap.remove("properties");
+    	}
+    }
+    
+    private String joinPath(String path, String key) {
+    	if (path.length() != 0)
+			path = path.concat(".");
+		path = path.concat(key);
+		return path;
+    }
+    
+    public void secondPass () throws InterruptedException {
+    	// if we are asked to delete index first
+	    if (cmd.hasOption("D"))
+	    	es.deleteIndex(alias);
+	    
+	    es.setupIndex(alias);
+    	
+    	// fix mapping hashmap mappings->alias->properties->mappedVars
+    	HashMap<String,Object> propertiesMap = new HashMap<String, Object>();
+    	propertiesMap.put("properties", mappedVars);
+    	
+    	HashMap<String, Object> typeMap = new HashMap<String, Object>();
+    	typeMap.put(type, propertiesMap);
+    	
+    	//HashMap<String, Object> mappings = new HashMap<String,Object>();
+    	//mappings.put("mappings", typeMap);
+    	
+    	log.debug("MAPPINGS: "+ gson.toJson(typeMap));
+    	
+    	es.setupMapping(alias, type, gson.toJson(typeMap));
+    	
+    	es.reindex(alias+"_firstpass", alias);
+    	
+    	es.deleteIndex(alias+"_firstpass");
+    }
+    
+    public void shutdown() throws InterruptedException {
+    	es.close();
     }
 
 	public void setAlias(String alias) {
@@ -97,4 +193,5 @@ public class FileProcessor {
 	public void setFile(CSVReader file) {
 		this.file = file;
 	}
+
 }

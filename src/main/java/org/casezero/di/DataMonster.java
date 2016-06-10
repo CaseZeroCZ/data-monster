@@ -59,5 +59,7 @@ public class DataMonster {
     			                         );
     	
     	processor.firstPass();
+    	processor.secondPass();
+    	processor.shutdown();
     }
 }
