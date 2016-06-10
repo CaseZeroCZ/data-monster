@@ -18,3 +18,4 @@ hs_err_pid*
 /.classpath
 /.project
 /.gitignore
+/dependency-reduced-pom.xml

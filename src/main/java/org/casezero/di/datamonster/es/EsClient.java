@@ -2,6 +2,7 @@ package org.casezero.di.datamonster.es;
 
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
+import org.elasticsearch.action.admin.indices.exists.indices.IndicesExistsRequest;
 import org.elasticsearch.action.admin.indices.mapping.put.PutMappingResponse;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
@@ -39,6 +40,11 @@ public class EsClient {
     private static final Logger log = LoggerFactory.getLogger(EsClient.class);
 
     private Client client;
+    private String esUser;
+    private String esPassword;
+    private String esClusterID;
+    private String esRegion;
+    private boolean enableSSL;
 
     public EsClient() {
         setupClient();
@@ -53,12 +59,6 @@ public class EsClient {
         Properties prop = new Properties();
         InputStream input = null;
 
-        String esUser = "";
-        String esPasswd = "";
-        String esClusterID = "";
-        String esRegion = "";
-        boolean esEnableSsl = true;
-
         try {
 
             input = this.getClass().getResourceAsStream("/es.properties");
@@ -68,10 +68,10 @@ public class EsClient {
 
             // get the property value and print it out
             esUser = prop.getProperty("shield_user");
-            esPasswd = prop.getProperty("shield_password"); // TODO: encrypt
+            esPassword = prop.getProperty("shield_password"); // TODO: encrypt
             esClusterID = prop.getProperty("es_cluster_id");
             esRegion = prop.getProperty("es_cluster_region");
-            esEnableSsl = Boolean.parseBoolean(prop.getProperty("es_enable_ssl"));
+            enableSSL = Boolean.parseBoolean(prop.getProperty("es_enable_ssl"));
 
         } catch (IOException e) {
             log.error("Error reading properties file", e);
@@ -91,12 +91,12 @@ public class EsClient {
                     .put("transport.ping_schedule", "5s")
                     .put("cluster.name", esClusterID)
                     .put("action.bulk.compress", false)
-                    .put("shield.transport.ssl", esEnableSsl)
+                    .put("shield.transport.ssl", enableSSL)
                     .put("request.headers.X-Found-Cluster", esClusterID)
                     .put("shield.user", new StringBuilder()
                             .append(esUser)
                             .append(":")
-                            .append(esPasswd)
+                            .append(esPassword)
                             .toString()) // shield username and password
                     .build();
 
@@ -134,7 +134,8 @@ public class EsClient {
      * @param index
      */
     public void setupIndex(String index){
-        client.admin().indices().create(new CreateIndexRequest(index)).actionGet();
+    	if (!(client.admin().indices().prepareExists(index).execute().actionGet().isExists()))
+            client.admin().indices().create(new CreateIndexRequest(index)).actionGet();
     }
 
     /**
@@ -274,5 +275,5 @@ public class EsClient {
     public Client getClient() {
         return client;
     }
-
+    
 }

@@ -1,9 +1,24 @@
 package org.casezero.di;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.Options;
+import org.apache.lucene.index.Fields;
+import org.casezero.di.datamonster.CommandLineArgs;
 import org.casezero.di.datamonster.es.EsClient;
+import org.casezero.di.datamonster.es.FileProcessor;
+import org.casezero.di.datamonster.Field;
 import org.elasticsearch.action.index.IndexResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import au.com.bytecode.opencsv.CSVReader;
 
 public class DataMonster {
 
@@ -12,23 +27,36 @@ public class DataMonster {
     /**
      * play with ES client
      * @param args
+     * @throws IOException 
      */
-    public static void main (String [] args){
-        EsClient esClient = new EsClient();
-        String alias = "food";
-        String type = "yummy";
-        String json = "{" +
-                "\"user\":\"kimchy\"," +
-                "\"postDate\":\"2013-01-30\"," +
-                "\"message\":\"trying out Elasticsearch\"" +
-                "}";
-
-        String index = esClient.generateIndexFromAlias(alias);
-        esClient.setupIndex(index);
-        IndexResponse response = esClient.putData(index, type, json);
-        esClient.updateAlias(index, alias);
-
-        log.info("SUCCESS Have client and inserted record");
-        esClient.close();
+    public static void main (String [] args) throws IOException{
+    	CommandLine cmd = new CommandLineArgs(args).parse();
+    	
+    	CSVReader reader = new CSVReader(new FileReader(cmd.getOptionValue("i")));
+    	
+        List<Field> fields = new ArrayList<Field>();
+        List<String> headers = new ArrayList<String>();
+    	
+    	if (cmd.hasOption("f")) {
+    		headers = Arrays.asList(reader.readNext());
+    		for (int i = 0; i < headers.size(); i++) {
+    			Field field = new Field();
+    			field.setColumnNumber(i);
+    			field.setOriginalFieldName(headers.get(i));
+    			fields.add(field);
+    		}
+    	} else {
+    		// Need to do something when there are no headers
+    	}
+    	
+    	FileProcessor processor = new FileProcessor(
+    			                             cmd.getOptionValue("a"),
+    			                             cmd.getOptionValue("t"),
+    			                             fields,
+    			                             cmd,
+    			                             reader
+    			                         );
+    	
+    	processor.firstPass();
     }
 }
