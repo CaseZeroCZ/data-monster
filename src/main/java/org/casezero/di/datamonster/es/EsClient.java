@@ -171,6 +171,10 @@ public class EsClient {
     	if (!(client.admin().indices().prepareExists(index).execute().actionGet().isExists()))
             client.admin().indices().create(new CreateIndexRequest(index)).actionGet();
     }
+    
+    public boolean hasIndex(String index) {
+    	return client.admin().indices().prepareExists(index).execute().actionGet().isExists();
+    }
 
     /**
      * Add mapping file to ES index
@@ -348,7 +352,6 @@ public class EsClient {
     	    scrollResp = client.prepareSearchScroll(scrollResp.getScrollId()).setScroll(new TimeValue(600000)).execute().actionGet();
     	    //Break condition: No hits are returned
     	    if (scrollResp.getHits().getHits().length == 0) {
-    	        log.info("Closing the bulk processor");
     	        bulkProcessor.awaitClose(5, TimeUnit.MINUTES);
     	        break; 
     	    }

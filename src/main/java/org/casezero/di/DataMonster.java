@@ -13,6 +13,9 @@ import org.apache.lucene.index.Fields;
 import org.casezero.di.datamonster.CommandLineArgs;
 import org.casezero.di.datamonster.es.EsClient;
 import org.casezero.di.datamonster.es.FileProcessor;
+import org.casezero.di.datamonster.parser.CSVFileReader;
+import org.casezero.di.datamonster.parser.DataReader;
+import org.casezero.di.datamonster.parser.DataReaderFactory;
 import org.casezero.di.datamonster.Field;
 import org.elasticsearch.action.index.IndexResponse;
 import org.slf4j.Logger;
@@ -31,29 +34,11 @@ public class DataMonster {
      * @throws InterruptedException 
      */
     public static void main (String [] args) throws IOException, InterruptedException{
-    	CommandLine cmd = new CommandLineArgs(args).parse();
+    	CommandLineArgs cmd = new CommandLineArgs(args).parse();
     	
-    	CSVReader reader = new CSVReader(new FileReader(cmd.getOptionValue("i")));
-    	
-        List<Field> fields = new ArrayList<Field>();
-        List<String> headers = new ArrayList<String>();
-    	
-    	if (cmd.hasOption("f")) {
-    		headers = Arrays.asList(reader.readNext());
-    		for (int i = 0; i < headers.size(); i++) {
-    			Field field = new Field();
-    			field.setColumnNumber(i);
-    			field.setOriginalFieldName(headers.get(i));
-    			fields.add(field);
-    		}
-    	} else {
-    		// Need to do something when there are no headers
-    	}
+    	DataReader reader = DataReaderFactory.getDataReader(cmd);
     	
     	FileProcessor processor = new FileProcessor(
-    			                             cmd.getOptionValue("a"),
-    			                             cmd.getOptionValue("t"),
-    			                             fields,
     			                             cmd,
     			                             reader
     			                         );

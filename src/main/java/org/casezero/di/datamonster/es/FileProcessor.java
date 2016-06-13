@@ -6,14 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
 
-import org.apache.commons.cli.CommandLine;
+import org.casezero.di.datamonster.CommandLineArgs;
 import org.casezero.di.datamonster.Field;
+import org.casezero.di.datamonster.parser.DataReader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.gson.Gson;
 
-import au.com.bytecode.opencsv.CSVReader;
 
 /**
  * @author smadenian
@@ -24,12 +24,11 @@ public class FileProcessor {
 	
 	private String alias;
 	private String type;
-	private List<Field> headers;
-	private CommandLine cmd;
+	private CommandLineArgs cmd;
 	
 	// TODO: make this into a generic reader not just CSV and have it 
 	//       return elements at a time
-	private CSVReader file;
+	private DataReader file;
 	
 	private Gson gson = new Gson();
 	private EsClient es;
@@ -38,12 +37,10 @@ public class FileProcessor {
 	private HashMap<String,Object> mappedVars = new HashMap<String,Object>();
 	
 	
-	public FileProcessor ( String alias, String type, 
-			               List<Field> headers, CommandLine cmd, 
-			               CSVReader file) {
-		this.alias = alias;
-		this.type = type;
-		this.headers = headers;
+	public FileProcessor ( CommandLineArgs cmd, 
+			               DataReader file) {
+		this.alias = cmd.getOptionValue(CommandLineArgs.INDEX_ALIAS);
+		this.type = cmd.getOptionValue(CommandLineArgs.INDEX_TYPE);
 		this.cmd = cmd;
 		this.file = file;
 		
@@ -65,18 +62,22 @@ public class FileProcessor {
     	loadProps();
     	String alias = this.alias +"_firstpass";
 	    
-	    String[] nextRow;
+	    List<String> nextRow;
 	    HashMap<String, Object> doc = new HashMap<String, Object>();
 	    
+	    if (es.hasIndex(alias)) {
+	    	es.deleteIndex(alias);
+	    }
 	    es.setupIndex(alias);
 	    
 	    int lineCount = 1;
-	    while((nextRow = file.readNext()) != null) {
-	    	for (int i = 0; i < nextRow.length; i++) {
-	    		doc.put(headers.get(i).getOriginalFieldName(), nextRow[i]);
+	    while((nextRow = file.getNext()) != null) {
+	    	List<Field> headers = file.getHeaders();
+	    	for (int i = 0; i < nextRow.size(); i++) {
+	    		doc.put(headers.get(i).getOriginalFieldName(), nextRow.get(i));
 	    		if (prop.containsKey(headers.get(i).getOriginalFieldName().toLowerCase())) {
 	    			
-	    			addNewStructureToDoc(doc, nextRow[i], prop.getProperty(headers.get(i).getOriginalFieldName().toLowerCase()), new String());
+	    			addNewStructureToDoc(doc, nextRow.get(i), prop.getProperty(headers.get(i).getOriginalFieldName().toLowerCase()), new String());
 	    		}
 	    	}
 	        try {
@@ -88,6 +89,7 @@ public class FileProcessor {
 	        lineCount++;
 	    }
 	    
+	    es.bulkFlush();
     }
     
     private void addNewStructureToDoc( HashMap<String, Object> doc, 
@@ -146,10 +148,12 @@ public class FileProcessor {
     
     public void secondPass () throws InterruptedException {
     	// if we are asked to delete index first
-	    if (cmd.hasOption("D"))
-	    	es.deleteIndex(alias);
+	    if (cmd.hasOption(CommandLineArgs.DELETE_INDEX)) {
+	    	if (es.hasIndex(alias))
+	    	    es.deleteIndex(alias);
+		    es.setupIndex(alias);
+	    }
 	    
-	    es.setupIndex(alias);
     	
     	// fix mapping hashmap mappings->alias->properties->mappedVars
     	HashMap<String,Object> propertiesMap = new HashMap<String, Object>();
@@ -167,7 +171,7 @@ public class FileProcessor {
     	
     	es.reindex(alias+"_firstpass", alias);
     	
-    	es.deleteIndex(alias+"_firstpass");
+    	//es.deleteIndex(alias+"_firstpass");
     }
     
     public void shutdown() throws InterruptedException {
@@ -182,15 +186,11 @@ public class FileProcessor {
 		this.type = type;
 	}
 
-	public void setHeaders(List<Field> headers) {
-		this.headers = headers;
-	}
-
-	public void setCmd(CommandLine cmd) {
+	public void setCmd(CommandLineArgs cmd) {
 		this.cmd = cmd;
 	}
 
-	public void setFile(CSVReader file) {
+	public void setFile(DataReader file) {
 		this.file = file;
 	}
 
