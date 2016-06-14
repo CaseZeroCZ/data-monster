@@ -1,24 +1,27 @@
 package org.casezero.di.datamonster.parser;
 
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import org.casezero.di.datamonster.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import au.com.bytecode.opencsv.CSVReader;
 
-public class CSVFileReader implements DataReader {
+public class CSVFileReader extends DataReader {
 	private static final Logger log = LoggerFactory.getLogger(CSVFileReader.class);
 	
 	private CSVReader file;
 	private CSVReader headerFile;
 	private List<Field> headers;
 	private String defaultDelimiter = ",";
+	
 	
 	/**
 	 * Constructor. The only place where you can instantiate reading a file.
@@ -59,12 +62,23 @@ public class CSVFileReader implements DataReader {
 		}
 	}
 
-	public List<String> getNext() throws IOException {
+	public String getNext() throws IOException {
 		String[] row = file.readNext();
 		if (row == null) {
 			return null;
 		}
-		return new ArrayList<String>(Arrays.asList(row));
+		
+		HashMap<String, Object> doc = new HashMap<String, Object>();
+		int size = Math.min(headers.size(), row.length);
+		
+		for (int i = 0; i < size; i++) {
+    		doc.put(headers.get(i).getOriginalFieldName(), row[i]);
+    		if (prop.containsKey(headers.get(i).getOriginalFieldName().toLowerCase())) {
+    			addNewStructureToDoc(doc, row[i], prop.getProperty(headers.get(i).getOriginalFieldName().toLowerCase()), new String());
+    		}
+    	}
+		
+		return new ObjectMapper().writeValueAsString(doc);
 	}
 
 	public List<Field> getHeaders() {

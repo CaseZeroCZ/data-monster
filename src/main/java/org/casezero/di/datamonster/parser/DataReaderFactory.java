@@ -22,7 +22,9 @@ public class DataReaderFactory {
     				      cmd.getOptionValue(CommandLineArgs.HEADER_FILE)
     				  );
     		  return csvReader;
-    		  
+    	  case "json":
+    		  DataReader jsonReader = new JSONFileReader(cmd.getOptionValue(CommandLineArgs.INPUT_FILE));
+    		  return jsonReader;
     	  default:
     		  throw new UnsupportedOperationException("file type "+ cmd.getOptionValue(CommandLineArgs.INPUT_FILE_TYPE) +" is not supported at this time");
     	}
