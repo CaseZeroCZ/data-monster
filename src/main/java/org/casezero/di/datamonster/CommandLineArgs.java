@@ -9,6 +9,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.collect.ImmutableMap;
@@ -61,21 +62,20 @@ public class CommandLineArgs {
 		cmd = null;
 		try {
 			cmd = parser.parse(options, args);
-			
-			if (cmd.hasOption("h")) 
-				help();
-			
-			for (String req : requiredArgs) {
-				if (!cmd.hasOption(req)) {
-					log.error("Missing required argument -"+ req);
-					help();
-				}
-			}
-			
 		} catch (ParseException e) {
 		    log.error("Failed to parse command line options");
 		    help();
 	    }
+		
+		if (cmd.hasOption(HELP)) 
+			help();
+		
+		for (String req : requiredArgs) {
+			if (!cmd.hasOption(req)) {
+				log.error("Missing required argument -"+ req);
+				help();
+			}
+		}
 		
 		return this;
 	}
@@ -96,6 +96,10 @@ public class CommandLineArgs {
 		
 		if ( defaults.containsKey(key) && value == null) {
 			value = defaults.get(key);
+		}
+		
+		if (key.equals(FILE_DELIMITER) && cmd.hasOption(FILE_DELIMITER)) {
+			value = StringEscapeUtils.unescapeJava(cmd.getOptionValue(FILE_DELIMITER));
 		}
 		
 		return value;

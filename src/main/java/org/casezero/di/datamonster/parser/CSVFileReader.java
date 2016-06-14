@@ -39,6 +39,7 @@ public class CSVFileReader extends DataReader {
 		if (delimiter == null || delimiter.toString().isEmpty()) {
 			delimiter = defaultDelimiter;
 		}
+		log.debug("DELIMITER IS "+ delimiter.charAt(0));
 		file = new CSVReader(new FileReader(inputFile), delimiter.charAt(0));
 		this.headers = new ArrayList<Field>();
 		List<String> stringHeaders = null;
