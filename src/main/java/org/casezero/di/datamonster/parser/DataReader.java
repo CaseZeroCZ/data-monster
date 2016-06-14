@@ -5,11 +5,13 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import org.casezero.di.datamonster.Field;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Splitter;
 
 public abstract class DataReader {
 	private static final Logger log = LoggerFactory.getLogger(DataReader.class);
@@ -67,8 +69,17 @@ public abstract class DataReader {
           }
           currMap = (HashMap<String, Object>) currMap.get(pathName);
         }
-
-        currMap.put("type", propDataTypes.getProperty(path));
+        
+        Map<String,String> mappings = Splitter.on(",")
+        		.omitEmptyStrings()
+        		.trimResults()
+        		.withKeyValueSeparator("|")
+        		.split(propDataTypes.getProperty(path));
+        
+        for (Entry<String, String> mapping : mappings.entrySet()) {
+        	currMap.put(mapping.getKey(), mapping.getValue());
+        } 
+        
         currMap.remove("properties");
       }
     }
