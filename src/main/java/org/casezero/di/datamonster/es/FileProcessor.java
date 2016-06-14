@@ -46,7 +46,7 @@ public class FileProcessor {
 	    
 	    String nextRow;
 	    
-	    if (es.hasIndex(alias)) {
+	    if (es.hasIndex(alias) && cmd.hasOption(CommandLineArgs.DELETE_INDEX)) {
 	    	es.deleteIndex(alias);
 	    }
 	    es.setupIndex(alias);
@@ -74,21 +74,23 @@ public class FileProcessor {
 	    }
 	    
     	
-    	// fix mapping hashmap mappings->alias->properties->mappedVars
-    	HashMap<String,Object> propertiesMap = new HashMap<String, Object>();
-    	propertiesMap.put("properties", file.getMappedVars());
+	    if (file.getMappedVars().size() > 0) {
+	    	// fix mapping hashmap mappings->alias->properties->mappedVars
+	    	HashMap<String,Object> propertiesMap = new HashMap<String, Object>();
+	    	propertiesMap.put("properties", file.getMappedVars());
+	    	
+	    	HashMap<String, Object> typeMap = new HashMap<String, Object>();
+	    	typeMap.put(type, propertiesMap);
+	    	
+	    	//HashMap<String, Object> mappings = new HashMap<String,Object>();
+	    	//mappings.put("mappings", typeMap);
+	    	
+	    	log.debug("MAPPINGS: "+ new ObjectMapper().writeValueAsString(typeMap));
+	    	
+	    	es.setupMapping(alias, type, new ObjectMapper().writeValueAsString(typeMap));
+	    }
     	
-    	HashMap<String, Object> typeMap = new HashMap<String, Object>();
-    	typeMap.put(type, propertiesMap);
-    	
-    	//HashMap<String, Object> mappings = new HashMap<String,Object>();
-    	//mappings.put("mappings", typeMap);
-    	
-    	log.debug("MAPPINGS: "+ new ObjectMapper().writeValueAsString(typeMap));
-    	
-    	es.setupMapping(alias, type, new ObjectMapper().writeValueAsString(typeMap));
-    	
-    	es.reindex(alias + firstPassName, alias);
+    	es.reindex(alias + firstPassName, type, alias);
     	
     	//es.deleteIndex(alias+firstPassName);
     }

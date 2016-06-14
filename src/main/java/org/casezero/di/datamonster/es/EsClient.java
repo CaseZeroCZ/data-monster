@@ -135,7 +135,11 @@ public class EsClient {
             log.error("Unable to connect to client", e);
         }
         
-        // set up bulk processor
+        setUpBulkProcessor();
+    }
+    
+    public void setUpBulkProcessor() {
+    	// set up bulk processor
         bulkProcessor = BulkProcessor.builder(client, new BulkProcessor.Listener() {
             public void beforeBulk(long executionId, BulkRequest request) {
                 log.info("Going to execute new bulk composed of {} actions", request.numberOfActions());
@@ -151,8 +155,10 @@ public class EsClient {
             }).build();
     }
     
-    public void bulkFlush() {
+    public void bulkFlush() throws InterruptedException {
     	bulkProcessor.flush();
+    	bulkProcessor.awaitClose(5, TimeUnit.MINUTES);
+    	setUpBulkProcessor();
     }
 
     public void deleteOldIndexes (String prefix) {
@@ -340,16 +346,17 @@ public class EsClient {
         return client;
     }
     
-    public void reindex(String oldIndex, String newIndex) throws InterruptedException {
+    public void reindex(String oldIndex, String oldType, String newIndex) throws InterruptedException {
     	SearchResponse scrollResp = client.prepareSearch(oldIndex) // Specify index
     			.setSearchType(SearchType.DEFAULT)
+    			//.setTypes(oldType)
     		    .setScroll(new TimeValue(60000))
     		    .setQuery(QueryBuilders.matchAllQuery()) // Match all query
     		    .setSize(100).execute().actionGet(); //100 hits per shard will be returned for each scroll
     	
     	//Scroll until no hits are returned
     	while (true) {
-    	    scrollResp = client.prepareSearchScroll(scrollResp.getScrollId()).setScroll(new TimeValue(600000)).execute().actionGet();
+    	    scrollResp = client.prepareSearchScroll(scrollResp.getScrollId()).setScroll(new TimeValue(60000)).execute().actionGet();
     	    //Break condition: No hits are returned
     	    if (scrollResp.getHits().getHits().length == 0) {
     	        bulkProcessor.awaitClose(5, TimeUnit.MINUTES);
