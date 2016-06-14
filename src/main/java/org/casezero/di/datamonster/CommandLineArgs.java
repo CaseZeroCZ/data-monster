@@ -45,7 +45,7 @@ public class CommandLineArgs {
 		this.args = args;
 		
 		options.addOption(HELP, "help", false, "Show Help");
-		options.addOption(INPUT_FILE, "input", true, "Input file to process (REQUIRED)");
+		options.addOption(INPUT_FILE, "input", true, "Input file to process or type STDIN to use stdin from command line (REQUIRED)");
 		options.addOption(INDEX_ALIAS, "alias", true, "ES Alias (Index) name to use (REQUIRED)");
 		options.addOption(INDEX_TYPE, "type", true, "ES Index Type name to use (REQUIRED)");
 		options.addOption(IS_FIRST_HEADER, "first", false, "Treat first line as file header (REQUIRED)");

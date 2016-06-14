@@ -2,6 +2,7 @@ package org.casezero.di.datamonster.parser;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,18 +21,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 
-public class JSONFileReader extends DataReader {
-	private static final Logger log = LoggerFactory.getLogger(JSONFileReader.class);
+public class JSONReader extends DataReader {
+	private static final Logger log = LoggerFactory.getLogger(JSONReader.class);
 
 	private Map<String,Field> headers = new HashMap<String,Field>();
 	private List<Field> headersList;
 	private String fileName;
 	JsonParser parser;
 	
-	public JSONFileReader(String inputFile) throws JsonParseException, IOException {
+	public JSONReader(String inputFile) throws JsonParseException, IOException {
 		fileName = inputFile;
 		JsonFactory f = new JsonFactory();
-	    parser = f.createParser(new File(fileName));
+		if (fileName.equals("STDIN")) {
+	      parser = f.createParser(System.in);
+		} else {
+	      parser = f.createParser(new File(fileName));
+		}
 	}
 	
 	@Override

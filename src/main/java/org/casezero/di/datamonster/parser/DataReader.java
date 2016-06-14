@@ -65,13 +65,13 @@ public abstract class DataReader {
             currMap.put(pathName, new HashMap<String,Object>());
             ((HashMap<String,Object>) currMap.get(pathName)).put("properties", new HashMap<String,Object>());
           }
-        currMap = (HashMap<String, Object>) currMap.get(pathName);
-      }
+          currMap = (HashMap<String, Object>) currMap.get(pathName);
+        }
 
-      currMap.put("type", propDataTypes.getProperty(path));
-      currMap.remove("properties");
+        currMap.put("type", propDataTypes.getProperty(path));
+        currMap.remove("properties");
+      }
     }
-}
 
     private String joinPath(String path, String key) {
       if (path.length() != 0)
